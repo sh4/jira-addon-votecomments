@@ -56,37 +56,45 @@ function ShowCurrentVotes() {
 
     if (typeof issueID === "undefined") {
 
-           // console.log("issueID  is undefined");
+        // console.log("issueID  is undefined");
 
-       } else {
+    } else {
 
-              AJS.$.getJSON(AJS.contextPath() + "/rest/votecomments/latest/commentsvotes?issueid=" + issueID, function (data) {
-                          AJS.$.each(data, function () {
-                              commentData['comment-' + this.commentid] = this;
-                          });
-                          AJS.$('.currentvotes').remove();
+        AJS.$.getJSON(AJS.contextPath() + "/rest/votecomments/latest/commentsvotes?issueid=" + issueID, function (data) {
+                AJS.$.each(data, function () {
+                    commentData['comment-' + this.commentid] = this;
+                });
+                AJS.$('.currentvotes').remove();
 
-                          AJS.$('div[id|=comment][id!=comment-wiki-edit]').each(function () {
-                              var commentId = AJS.$(this).attr('id').split('-')[1];
-                              AJS.$(this).find('.action-links').each(function () {
-                                  //Add the current votes
-                                  var cmData = commentData["comment-" + commentId];
+                AJS.$('div[id|=comment][id!=comment-wiki-edit]').each(function () {
+                    var commentId = AJS.$(this).attr('id').split('-')[1];
+                    AJS.$(this).find('.action-links').each(function () {
+                        //Add the current votes
+                        var cmData = commentData["comment-" + commentId];
 
-                                  if (cmData && cmData.downvotes) {
-                                      AJS.$(this).before(
-                                          AJS.$('<div class="currentvotes dislikes">' + cmData.downvotes + ' dislike(s)</div>')
-                                      );
-                                  }
-                                  if (cmData && cmData.upvotes) {
-                                      AJS.$(this).before(
-                                          AJS.$('<div class="currentvotes likes">' + cmData.upvotes + ' like(s)</div>')
-                                      );
-                                  }
-                              });
-                          });
-                      }
-                  );
-       }
+                        if (cmData && cmData.downvotes) {
+                            AJS.$(this).before(
+                                AJS.$(
+                                    '<div class="currentvotes dislikes">' + cmData.downvotes + ' dislike(s)</div>'
+                                ).attr({
+                                    title: cmData.downvoters.map(function (u) { return u.displayName }).join(", ")
+                                }).tooltip()
+                            );
+                        }
+                        if (cmData && cmData.upvotes) {
+                            AJS.$(this).before(
+                                AJS.$(
+                                    '<div class="currentvotes likes">' + cmData.upvotes + ' like(s)</div>'
+                                ).attr({
+                                    title: cmData.upvoters.map(function (u) { return u.displayName }).join(", ")
+                                }).tooltip()
+                            );
+                        }
+                    });
+                });
+            }
+        );
+    }
 
 
 }

@@ -9,12 +9,18 @@ import com.atlassian.jira.issue.comments.CommentManager;
 import com.atlassian.jira.security.PermissionManager;
 import com.atlassian.jira.security.Permissions;
 import com.atlassian.jira.user.ApplicationUser;
+import com.atlassian.jira.user.util.UserManager;
+import com.atlassian.plugin.spring.scanner.annotation.imports.ComponentImport;
 import com.atlassian.plugins.rest.common.security.AnonymousAllowed;
 import com.atlassian.sal.api.transaction.TransactionCallback;
 import info.renjithv.votecomments.VoteInfo;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 
+import javax.annotation.Nonnull;
+import javax.inject.Singleton;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -29,19 +35,29 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * A resource of message.
  */
 @Path("/")
+@Singleton
+@Component
 public class VoteComments {
 
     private static final Logger log = LogManager.getLogger("votecomments");
-    private ActiveObjects ao;
-    private IssueManager issueManager;
-    private PermissionManager permissionManager;
-    private CommentManager commentManager;
+    private final ActiveObjects ao;
+    private final IssueManager issueManager;
+    private final PermissionManager permissionManager;
+    private final CommentManager commentManager;
+    private final UserManager userManager;
 
-    public VoteComments(ActiveObjects ao, IssueManager issueManager, PermissionManager permissionManager, CommentManager commentManager) {
+    @Autowired
+    public VoteComments(@ComponentImport final ActiveObjects ao,
+                        @ComponentImport final IssueManager issueManager,
+                        @ComponentImport final PermissionManager permissionManager,
+                        @ComponentImport final CommentManager commentManager,
+                        @ComponentImport final UserManager userManager)
+    {
         this.issueManager = issueManager;
         this.permissionManager = permissionManager;
         this.commentManager = commentManager;
         this.ao = checkNotNull(ao);
+        this.userManager = userManager;
     }
 
     @GET
@@ -71,12 +87,13 @@ public class VoteComments {
                         if (data.containsKey(voteInfo.getCommentId())) {
                             inData = data.get(voteInfo.getCommentId());
                         }
+                        VoterUserModel model = getVoterUserModel(voteInfo);
                         switch (voteInfo.getVoteCount()) {
                             case -1:
-                                inData.setDownVotes(inData.getDownVotes() + 1);
+                                inData.setDownVotes(inData.getDownVotes() + 1, model);
                                 break;
                             case 1:
-                                inData.setUpVotes(inData.getUpVotes() + 1);
+                                inData.setUpVotes(inData.getUpVotes() + 1, model);
                                 break;
                             default:
                                 log.error("No way this can happen");
@@ -92,6 +109,15 @@ public class VoteComments {
             log.warn("Get votes request ignored");
         }
         return Response.ok(data.values()).build();
+    }
+
+    @Nonnull
+    private VoterUserModel getVoterUserModel(VoteInfo voteInfo) {
+        ApplicationUser voter = userManager.getUserByName(voteInfo.getUserName());
+        String userName = voteInfo.getUserName();
+        String displayName = (voter != null)  ? voter.getDisplayName() : userName;
+        VoterUserModel model = new VoterUserModel(userName, displayName);
+        return model;
     }
 
     @GET
@@ -147,14 +173,14 @@ public class VoteComments {
                             log.info("Existing vote found for this user, comment and issue");
                             Integer vote = votes[0].getVoteCount();
                             vote = vote + increment;
-                        /*
-                        * -1 + 1  = 0 = delete
-                        * 0  + 1  => This is not possible
-                        * 1  + 1  => 2 = 1
-                        * -1 + -1 => -2 = -1
-                        * 0  + -1 => This is not possible
-                        * 1  + -1 = 0 = delete
-                        * */
+                            /*
+                             * -1 + 1  = 0 = delete
+                             * 0  + 1  => This is not possible
+                             * 1  + 1  => 2 = 1
+                             * -1 + -1 => -2 = -1
+                             * 0  + -1 => This is not possible
+                             * 1  + -1 = 0 = delete
+                             * */
                             switch (vote) {
                                 case 0:
                                     ao.delete(votes[0]);
